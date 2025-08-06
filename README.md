@@ -1,0 +1,2 @@
+# brot
+A trading robot
