@@ -1,117 +1,112 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 """
-Brot trading robot - Main entry point
+Brot Trading Robot - Main Entry Point
+Now with actual trading logic structure
 """
-#Imports Section
-import time # module for delays
-import logging # module for logs
-from datetime import datetime # module for date and time
-import sys # module for system-spec<ic parameters and functions
 
-# Configure logging
+import time
+import logging
+import sys
+from datetime import datetime
+
+# Import our modules
+from config import settings
+from strategies.mean_reversion import MeanReversionStrategy
+from core.models import Position
+
+# Configure logging with our settings
 logging.basicConfig(
-    level=logging.INFO, # Show informational messages and above
-    format='%(asctime)s - %'(name)s - %(levelname)s - %(message)s', #timestamp, name, level, message
+    level=getattr(logging, settings.LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('brot.log'), # Log to a file
-        logging.StreamHandler(sys.stdout) # Print to screen
+        logging.FileHandler(settings.LOG_FILE),
+        logging.StreamHandler(sys.stdout)
     ]
 )
 
-#Create a logger object for this module
 logger = logging.getLogger(__name__)
-def check_trading_hours():
-    """
-    Check if market is open
-    """
-    current_hour = datetime.now().hour # Get current hour
-    # Simplified check, let's timezone it later
-    if 9 <= current_hour < 16:
-        return True
-    return False
 
-def initialize_bot():
+class BrotTradingRobot:
     """
-    Initialize the trading bot
+    Main trading robot class that orchestrates everything
     """
-    logger.info("Initializing Brot Trading Bot...")
-
-    # TODO : Initialize components
-    # Load configuration
-    # Connect to the broker
-    # Set up data feeds
-    # Load strategies
-
-    logger.info("Initialization complete.")
     
-def main_trading_loop():
-    """
-    Main trading loop
-    """
-    logger.info("Starting main trading loop...")
-
-    cycle_count = 0 # Keep track of cycles
-
-    # Main loop
-    while True:
+    def __init__(self):
+        """Initialize the trading robot"""
+        self.strategy = MeanReversionStrategy()
+        self.positions: Dict[str, Position] = {}
+        self.is_running = False
+        
+    def initialize(self) -> bool:
+        """Set up all components"""
         try:
-            cycle_count += 1
-            logger.info(f"Trading cycle{ cycle_count} starting...")
-
-            #Check if market is open
-            if not check_trading_hours():
-                logger.info("Market is closed. Waiting...")
-                time.sleep(300)  # Wait for 5 minutes
-                continue
-
-            # TODO: Implement trading logic
-            # - Fetch market data
-            # - Checkl positions
-            # - Run strategies
-            # - Execute trades
-
-            logger.info("Trading cycle complete.")
-
-            #Wait before next cycle
-            time.sleep(60)  # Wait for 1 minute before next cycle
-
-        except Keyboard interrupt
-            # When ctrl+C is pressed, exit gracefully
-            logger.info("Shutdown received. Exiting...")
-            break # Exit the loop
-
+            logger.info("Initializing Brot Trading Robot...")
+            
+            # Validate configuration
+            settings.validate_config()
+            
+            # TODO: Initialize broker connection
+            # TODO: Load existing positions
+            # TODO: Set up data feeds
+            
+            logger.info(f"Monitoring {len(settings.TRADING_UNIVERSE)} symbols")
+            logger.info("Initialization complete!")
+            return True
+            
         except Exception as e:
-            # Catch other errors
-            logger.error(f"Error in trading loop: {e}")
-            time.sleep(30)  # Wait before retrying
+            logger.error(f"Failed to initialize: {e}")
+            return False
+    
+    def run(self):
+        """Main trading loop"""
+        self.is_running = True
+        cycle_count = 0
+        
+        while self.is_running:
+            try:
+                cycle_count += 1
+                logger.info(f"Starting trading cycle {cycle_count}")
+                
+                # TODO: Get market data
+                # TODO: Run strategy
+                # TODO: Execute trades
+                
+                logger.info(f"Completed trading cycle {cycle_count}")
+                
+                # Wait for next cycle
+                time.sleep(settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS'])
+                
+            except KeyboardInterrupt:
+                logger.info("Received shutdown signal")
+                self.shutdown()
+                break
+                
+            except Exception as e:
+                logger.error(f"Error in trading loop: {e}", exc_info=True)
+                time.sleep(30)
+    
+    def shutdown(self):
+        """Clean shutdown"""
+        logger.info("Shutting down Brot...")
+        self.is_running = False
+        # TODO: Close connections
+        # TODO: Save state
 
-def shutdown_bot():
-    """
-    Clean shutdown - close connections, save state, etc.
-    """
-    logger.info("Shutting down Brot Trading Robot...")
-    # TODO: Cleanup tasks
-    # - Close broker copnnections
-    # - Save current state
-    # - Close database connections
-    logger.info("Shutdown complete.")
-
-def __name__ == "__main__":
-    """
-    Check if the script is being run directly 
-    (not imported as a module)
-    """
-
-    print("=== Brot the Brobot ===")
-    print(f"Starting at {datetime.now()}")
-    # Initialize the bot
-    if initialize_bot():
+def main():
+    """Entry point"""
+    print("=== Brot Trading Robot ===")
+    print(f"Environment: {settings.ENVIRONMENT}")
+    print(f"Started at: {datetime.now()}")
+    
+    robot = BrotTradingRobot()
+    
+    if robot.initialize():
         try:
-            # Run the main trading loop
-            main_trading_loop()
+            robot.run()
         finally:
-            # This always runs, even on error
-            shutdown_bot()
-    else : 
-        logger.error("Brot the brobot is not feeling it today")
-        sys.exit(1) #Exit with error code 1w
+            robot.shutdown()
+    else:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
