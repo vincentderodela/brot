@@ -8,6 +8,7 @@ import time
 import logging
 import sys
 from datetime import datetime
+from typing import Dict
 
 # Import our modules
 from config import settings
