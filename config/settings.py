@@ -12,7 +12,7 @@ import json
 PROJECT_ROOT = Path(__file__).parent.parent
 
 # Environment management
-Environment = os.getenv('ENVIRONMENT', 'development')
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
 IS_PRODUCTION = Environment == 'production'
 
 # Logging configuration
@@ -29,9 +29,9 @@ TRADING_CONFIG = {
 # Strategies Parameters
 MEAN_REVERSION_CONFIG = {
     'LOOKBACK_DAYS': 7,
-    'DROP_THRESHOLD': 0.10
-    'GAIN_THRESHOLD': 0.10
-    'MAX_HOLDING DAYS': 90
+    'DROP_THRESHOLD': 0.10,
+    'GAIN_THRESHOLD': 0.10,
+    'MAX_HOLDING_DAYS': 90,
     'MAX_ADDITIONS': 3
 }
 
@@ -57,12 +57,12 @@ def setup_directories():
     # Create required directories if they do not exist
     directories = [
         PROJECT_ROOT / 'logs',  
-        PROJECT_ROOT / 'data' / cache,
+        PROJECT_ROOT / 'data' / 'cache',
         PROJECT_ROOT / 'data' / 'historical',
     ]
 
-for directory in directories:
-    directory.mkdir(parents=True, exist_ok=True)
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
 
 # Load configuration from a JSON file (optional)
 def load_config_from_json(filename: str = 'config.json') -> Dict:
