@@ -31,13 +31,38 @@ class BrotTradingRobot:
     """
     Main trading robot class that orchestrates everything
     """
-    
+
     def __init__(self):
         """Initialize the trading robot"""
         self.strategy = MeanReversionStrategy()
+        self.data_feed = DataFeed()  # Add this line
         self.positions: Dict[str, Position] = {}
         self.is_running = False
+
+    def run(self):
+        """Main trading loop"""
+        self.is_running = True
+        cycle_count = 0
         
+        while self.is_running:
+            try:
+                cycle_count += 1
+                logger.info(f"Starting trading cycle {cycle_count}")
+                
+                # Get market data
+                latest_prices = self.data_feed.get_latest_prices()
+                historical_data = self.data_feed.get_historical_data()
+                
+                # Run strategy
+                signals = self.strategy.analyze(historical_data, self.positions)
+                
+                # TODO: Execute trades based on signals
+                
+                logger.info(f"Completed trading cycle {cycle_count}")
+                
+                # Wait for next cycle
+                time.sleep(settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS'])
+            
     def initialize(self) -> bool:
         """Set up all components"""
         try:
