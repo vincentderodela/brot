@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 # Environment management
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-IS_PRODUCTION = Environment == 'production'
+IS_PRODUCTION = ENVIRONMENT == 'production'
 
 # Logging configuration
 LOG_LEVEL = 'DEBUG' if not IS_PRODUCTION else 'INFO'

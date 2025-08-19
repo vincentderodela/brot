@@ -14,6 +14,7 @@ from typing import Dict
 from config import settings
 from strategies.mean_reversion import MeanReversionStrategy
 from core.models import Position
+from data.feed import DataFeed
 
 # Configure logging with our settings
 logging.basicConfig(
@@ -62,6 +63,15 @@ class BrotTradingRobot:
                 
                 # Wait for next cycle
                 time.sleep(settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS'])
+                
+            except KeyboardInterrupt:
+                logger.info("Received shutdown signal")
+                self.shutdown()
+                break
+                
+            except Exception as e:
+                logger.error(f"Error in trading loop: {e}", exc_info=True)
+                time.sleep(30)
             
     def initialize(self) -> bool:
         """Set up all components"""
@@ -82,35 +92,7 @@ class BrotTradingRobot:
         except Exception as e:
             logger.error(f"Failed to initialize: {e}")
             return False
-    
-    def run(self):
-        """Main trading loop"""
-        self.is_running = True
-        cycle_count = 0
-        
-        while self.is_running:
-            try:
-                cycle_count += 1
-                logger.info(f"Starting trading cycle {cycle_count}")
-                
-                # TODO: Get market data
-                # TODO: Run strategy
-                # TODO: Execute trades
-                
-                logger.info(f"Completed trading cycle {cycle_count}")
-                
-                # Wait for next cycle
-                time.sleep(settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS'])
-                
-            except KeyboardInterrupt:
-                logger.info("Received shutdown signal")
-                self.shutdown()
-                break
-                
-            except Exception as e:
-                logger.error(f"Error in trading loop: {e}", exc_info=True)
-                time.sleep(30)
-    
+
     def shutdown(self):
         """Clean shutdown"""
         logger.info("Shutting down Brot...")

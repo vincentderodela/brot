@@ -1,11 +1,11 @@
 """
-Data feed for module for Brot
+Data feed module for Brot Trading Robot
 Handles fetching and caching price data from Alpaca
 """
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Deque
+from typing import Dict, List, Optional, Deque
 from collections import deque, defaultdict
 import pandas as pd
 import os
@@ -17,60 +17,62 @@ from alpaca.data.timeframe import TimeFrame
 
 # Import our own models
 from core.models import PriceData
-from config.settins import TRADING_UNIVERSE, MEAN_REVERSION_CONFIG
+from config.settings import TRADING_UNIVERSE, MEAN_REVERSION_CONFIG
 
-# Set up logging
+# Set up logging for this module
 logger = logging.getLogger(__name__)
 
 
 class DataFeed:
     """
-    Manage real-time and historical price data
+    Manages real-time and historical price data
     
-    This class is responsible for :
+    This class is responsible for:
     1. Fetching data from Alpaca API
     2. Caching recent data in memory
     3. Converting raw data to our PriceData format
     """
-
-    def __init__(self,symbols: Lists[str] = None):
+    
+    def __init__(self, symbols: List[str] = None):
         """
-        Initialize the DataFeed
-
+        Initialize the data feed
+        
         Args:
-            symbols : List of symbols to track. If None, uses TRADING_UNIVERSE
+            symbols: List of symbols to track. If None, uses TRADING_UNIVERSE
         """
-        # Use provided symbols or default to our trading univers
+        # Use provided symbols or default to our trading universe
         self.symbols = symbols or TRADING_UNIVERSE
-
+        
         # Cache to store recent price data for each symbol
         # defaultdict automatically creates a new deque if key doesn't exist
+        # deque = "double-ended queue" - efficient for adding/removing from ends
         self.price_cache: Dict[str, Deque[PriceData]] = defaultdict(
-              lambda: deque(maxlen=MEAN_REVERSION_CONFIG['LOOKBACK_DAYS']+10)
+            lambda: deque(maxlen=MEAN_REVERSION_CONFIG['LOOKBACK_DAYS'] + 10)
+            # maxlen automatically removes old items when full
         )
-
+        
         # Initialize Alpaca client for data
-        # Using environment variables for API keys
+        # Using environment variables for API keys (secure practice)
         api_key = os.getenv('ALPACA_API_KEY')
-        api_secret = os.getenv('ALPACA_SECRET_KEY')
-
+        secret_key = os.getenv('ALPACA_SECRET_KEY')
+        
         if not api_key or not secret_key:
-            # For paper trading we can use free data
+            # For paper trading, we can use free data
             logger.warning("No API keys found, using free tier data")
             self.client = StockHistoricalDataClient(
-                api_key=None, 
-                secret_key=None
-                raw_data=False # Get data as pandas DataFrame
+                api_key=None,
+                secret_key=None,
+                raw_data=False  # Get data as pandas DataFrame
             )
         else:
             self.client = StockHistoricalDataClient(
-                api_key=api_key, 
+                api_key=api_key,
                 secret_key=secret_key,
                 raw_data=False
             )
-
+        
         logger.info(f"DataFeed initialized for {len(self.symbols)} symbols")
-
+    
     def get_latest_prices(self) -> Dict[str, PriceData]:
         """
         Get the most recent price for each symbol
@@ -85,84 +87,82 @@ class DataFeed:
             }
         """
         latest_prices = {}
-
-        # Get data from the lasdt 2 minutes to ensure we have recent data
+        
+        # Get data from the last 2 minutes to ensure we have recent data
         end_time = datetime.now()
         start_time = end_time - timedelta(minutes=2)
-
+        
         try:
-            # Create request for 1m bars
-            request_params = StockBarsRequest(
-                symbol_or_symbols=self.symbols, # Can pass list of symbols
-                timeframe=TimeFrame.Minute, # 1m candles
+            # Create request for 1-minute bars
+            request = StockBarsRequest(
+                symbol_or_symbols=self.symbols,  # Can pass list of symbols
+                timeframe=TimeFrame.Minute,       # 1-minute candles
                 start=start_time,
                 end=end_time
             )
-
+            
             # Fetch from Alpaca
             bars_df = self.client.get_stock_bars(request).df
-
+            
             # Process each symbol
             for symbol in self.symbols:
                 if symbol in bars_df.index.get_level_values('symbol'):
                     # Get the most recent bar for this symbol
-
                     symbol_data = bars_df.xs(symbol, level='symbol')
                     if not symbol_data.empty:
                         # Take the last (most recent) row
                         latest_bar = symbol_data.iloc[-1]
-
+                        
                         # Convert to our PriceData format
-                        price_data = self._convert_to_price_data(
+                        price_data = self._convert_bar_to_price_data(
                             symbol=symbol,
                             bar=latest_bar,
                             timestamp=symbol_data.index[-1]
                         )
-
+                        
                         latest_prices[symbol] = price_data
-
+                        
                         # Add to cache
                         self.price_cache[symbol].append(price_data)
-
+            
             logger.debug(f"Fetched latest prices for {len(latest_prices)} symbols")
-
-        except Exception as e:  
+            
+        except Exception as e:
             logger.error(f"Error fetching latest prices: {e}")
-
-            # Return cache data if available
-            for symbol in self.symbols: 
+            # Return cached data if available
+            for symbol in self.symbols:
                 if self.price_cache[symbol]:
                     latest_prices[symbol] = self.price_cache[symbol][-1]
-
+        
         return latest_prices
-
+    
     def get_historical_data(self, days: int = None) -> Dict[str, List[PriceData]]:
         """
-        Get historical data for analysis
-
+        Get historical price data for analysis
+        
         Args:
-            days: Number of days to fetch
-            Defaults to LOOKBACK_DAYS + 1
+            days: Number of days of history to fetch.
+                  Defaults to LOOKBACK_DAYS + 1
         
         Returns:
             Dictionary mapping symbol to list of PriceData objects
-
+            
         The returned data structure looks like:
-            {
-                'AAPL': [PriceData(...), PriceData(...), ...],
-                'MSFT': [PriceData(...), PriceData(...), ...]
-            }
+        {
+            'AAPL': [PriceData(...), PriceData(...), ...],
+            'MSFT': [PriceData(...), PriceData(...), ...]
+        }
         """
-        # Default to lookback period plu sone extra day
+        # Default to lookback period plus one extra day
         days = days or (MEAN_REVERSION_CONFIG['LOOKBACK_DAYS'] + 1)
-
-        #Calculate time range
+        
+        # Calculate time range
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=days)    
-
+        start_time = end_time - timedelta(days=days)
+        
         historical_data = {}
-
-        try
+        
+        try:
             # Create request for daily bars
             request = StockBarsRequest(
                 symbol_or_symbols=self.symbols,
@@ -170,10 +170,10 @@ class DataFeed:
                 start=start_time,
                 end=end_time
             )
-
+            
             # Fetch from Alpaca
             bars_df = self.client.get_stock_bars(request).df
-
+            
             # Process each symbol
             for symbol in self.symbols:
                 if symbol in bars_df.index.get_level_values('symbol'):
