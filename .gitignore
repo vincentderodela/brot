@@ -1,10 +1,21 @@
-.env			# API
-*.log			# Log files
-__pycache_/		# Python cache
-brot_env/		# Virtual environment
-.DS_Store		# macos files
-config/secrets.py	# Sensitive config
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
 *.pyc
-.pytest_cache/
+brot_env/
+venv/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# IDE
 .vscode/
 .idea/
