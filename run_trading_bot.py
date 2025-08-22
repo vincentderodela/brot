@@ -6,7 +6,9 @@ Complete trading bot that analyzes and executes trades
 import logging
 import sys
 import time
+import json
 from datetime import datetime
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,8 +24,27 @@ from strategies.mean_reversion import MeanReversionStrategy
 from execution.broker import AlpacaBroker
 from execution.orders import OrderManager
 from config import settings
+from core.models import Order, OrderSide, OrderType
 
 logger = logging.getLogger(__name__)
+
+def log_trade(action, symbol, quantity, price, reason):
+    """Log trades to file"""
+    # Create logs directory if it doesn't exist
+    import os
+    os.makedirs('logs', exist_ok=True)
+    
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'action': action,
+        'symbol': symbol,
+        'quantity': quantity,
+        'price': price,
+        'reason': reason
+    }
+    
+    with open('logs/trades.json', 'a') as f:
+        f.write(json.dumps(log_entry) + '\n')
 
 
 def execute_trading_cycle():
@@ -49,12 +70,34 @@ def execute_trading_cycle():
     positions = broker.get_positions()
     print(f"Current Positions: {len(positions)}")
 
-    # Show what positions we have
+    # Check positions for sell signals
     if positions:
         for symbol, pos in positions.items():
             print(f"  {symbol}: {pos.quantity} shares @ ${pos.avg_entry_price:.2f}")
-            # Update strategy tracking
             strategy.update_position_tracking(symbol, 'opened')
+            
+            # Check if position has gained enough
+            if pos.unrealized_pnl_percent >= settings.MEAN_REVERSION_CONFIG['GAIN_THRESHOLD'] * 100:
+                print(f"\nSELL SIGNAL: {symbol}")
+                print(f"Reason: Position up {pos.unrealized_pnl_percent:.1f}%")
+                
+                # Create sell order
+                sell_order = Order(
+                    symbol=symbol,
+                    side=OrderSide.SELL,
+                    order_type=OrderType.MARKET,
+                    quantity=pos.quantity,
+                    order_id=f"ORD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{symbol}",
+                    status=OrderStatus.PENDING
+                )
+                
+                order_id = broker.place_order(sell_order)
+                if order_id:
+                    print(f"✓ Sell order placed: {order_id}")
+                    # Log the trade
+                    log_trade('SELL', symbol, pos.quantity, pos.current_price, 
+                             f"Position up {pos.unrealized_pnl_percent:.1f}%")
+
     
     # Get market data
     print("\nFetching market data...")
