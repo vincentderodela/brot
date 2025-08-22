@@ -9,7 +9,6 @@ import time
 import json
 from datetime import datetime
 
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -24,7 +23,7 @@ from strategies.mean_reversion import MeanReversionStrategy
 from execution.broker import AlpacaBroker
 from execution.orders import OrderManager
 from config import settings
-from core.models import Order, OrderSide, OrderType
+from core.models import Order, OrderSide, OrderType, OrderStatus  # Added OrderStatus
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +80,12 @@ def execute_trading_cycle():
                 print(f"\nSELL SIGNAL: {symbol}")
                 print(f"Reason: Position up {pos.unrealized_pnl_percent:.1f}%")
                 
-                # Create sell order
+                # Create sell order - FIXED: using pos.quantity
                 sell_order = Order(
                     symbol=symbol,
                     side=OrderSide.SELL,
                     order_type=OrderType.MARKET,
-                    quantity=pos.quantity,
+                    quantity=pos.quantity,  # FIXED: was position.quantity
                     order_id=f"ORD_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{symbol}",
                     status=OrderStatus.PENDING
                 )
@@ -97,7 +96,6 @@ def execute_trading_cycle():
                     # Log the trade
                     log_trade('SELL', symbol, pos.quantity, pos.current_price, 
                              f"Position up {pos.unrealized_pnl_percent:.1f}%")
-
     
     # Get market data
     print("\nFetching market data...")
@@ -111,24 +109,33 @@ def execute_trading_cycle():
         print("No trading signals generated")
         return
     
+    # Initialize sets for tracking
+    open_symbols = set()
+    filled_symbols = set()
+    
+    # FIXED: Proper indentation for try-except blocks
     try:
-        # Correct API call - use get_all_orders with query_filter
+        # Get all open orders
         from alpaca.trading.enums import QueryOrderStatus
         from alpaca.trading.requests import GetOrdersRequest
         
-        # Get all open orders
         open_orders = broker.client.get_orders()  # Get all orders
-        open_symbols = {order.symbol for order in open_orders if order.status in ['new', 'pending_new', 'partially_filled', 'accepted']}
+        open_symbols = {order.symbol for order in open_orders 
+                       if order.status in ['new', 'pending_new', 'partially_filled', 'accepted']}
         
         if open_symbols:
             print(f"Open orders for: {', '.join(open_symbols)}")
             
     except Exception as e:
         open_symbols = set()
-        logger.error(f"Could not get orders: {e}")
-
-            
+        logger.error(f"Could not get open orders: {e}")
+    
+    # FIXED: This try block is now at the correct indentation level
+    try:
         # Also get filled orders from today to avoid re-buying
+        from alpaca.trading.enums import QueryOrderStatus
+        from alpaca.trading.requests import GetOrdersRequest
+        
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         filled_request = GetOrdersRequest(
             status=QueryOrderStatus.FILLED,
@@ -141,15 +148,14 @@ def execute_trading_cycle():
             print(f"Already bought today: {', '.join(filled_symbols)}")
             
     except Exception as e:
-        open_symbols = set()
         filled_symbols = set()
-        logger.error(f"Could not get orders: {e}")
+        logger.error(f"Could not get filled orders: {e}")
 
     # Process signals
     print(f"\nFound {len(signals)} signals:")
     
     for signal in signals:
-    # Check if we should skip this symbol
+        # Check if we should skip this symbol
         if signal.symbol in positions:
             print(f"Skipping {signal.symbol} - have position")
             continue

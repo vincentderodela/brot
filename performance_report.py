@@ -1,3 +1,5 @@
+import json
+
 def generate_report():
     with open('logs/trades.json', 'r') as f:
         trades = [json.loads(line) for line in f]
