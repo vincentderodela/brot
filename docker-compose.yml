@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  brot:
+    build: .
+    container_name: brot_trading_bot
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./config/settings.py:/app/config/settings.py:ro
+    networks:
+      - brot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  brot_network:
+    driver: bridge
+

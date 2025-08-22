@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+brot_env/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+
+# Logs
+logs/*.log
+
+# Documentation
+README.md
+*.md
+
