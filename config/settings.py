@@ -29,8 +29,8 @@ TRADING_CONFIG = {
 # Strategies Parameters
 MEAN_REVERSION_CONFIG = {
     'LOOKBACK_DAYS': 7,
-    'DROP_THRESHOLD': 0.02, # Changed from 0.10 (10%) to 0.02 (2%) for testing
-    'GAIN_THRESHOLD': 0.02, # Changed from 0.10 (10%) to 0.02 (2%) for testing
+    'DROP_THRESHOLD': 0.01, # Changed from 0.10 (10%) to 0.02 (2%) for testing
+    'GAIN_THRESHOLD': 0.01, # Changed from 0.10 (10%) to 0.02 (2%) for testing
     'MAX_HOLDING_DAYS': 90,
     'MAX_ADDITIONS': 3
 }
