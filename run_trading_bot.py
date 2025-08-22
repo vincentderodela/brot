@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""
+Complete trading bot that analyzes and executes trades
+"""
+
+import logging
+import sys
+import time
+from datetime import datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from data.feed import DataFeed
+from strategies.mean_reversion import MeanReversionStrategy
+from execution.broker import AlpacaBroker
+from execution.orders import OrderManager
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def execute_trading_cycle():
+    """Execute one complete trading cycle"""
+    
+    print(f"\n{'='*50}")
+    print(f"Trading Cycle - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*50}")
+    
+    # Initialize components
+    symbols = settings.TRADING_UNIVERSE[:10]  # Use first 10 symbols
+    feed = DataFeed(symbols)
+    strategy = MeanReversionStrategy()
+    broker = AlpacaBroker()
+    
+    # Get account info
+    account = broker.get_account_info()
+    order_manager = OrderManager(capital=account['cash'])
+    
+    print(f"\nAccount Balance: ${account['cash']:,.2f}")
+    
+    # Get current positions
+    positions = broker.get_positions()
+    print(f"Current Positions: {len(positions)}")
+
+    # Show what positions we have
+    if positions:
+        for symbol, pos in positions.items():
+            print(f"  {symbol}: {pos.quantity} shares @ ${pos.avg_entry_price:.2f}")
+            # Update strategy tracking
+            strategy.update_position_tracking(symbol, 'opened')
+    
+    # Get market data
+    print("\nFetching market data...")
+    historical_data = feed.get_historical_data(days=20)
+    
+    # Run strategy
+    print("Analyzing for signals...")
+    signals = strategy.analyze(historical_data, positions)
+    
+    if not signals:
+        print("No trading signals generated")
+        return
+    
+    try:
+        # Correct API call - use get_all_orders with query_filter
+        from alpaca.trading.enums import QueryOrderStatus
+        from alpaca.trading.requests import GetOrdersRequest
+        
+        # Get all open orders
+        open_orders = broker.client.get_orders()  # Get all orders
+        open_symbols = {order.symbol for order in open_orders if order.status in ['new', 'pending_new', 'partially_filled', 'accepted']}
+        
+        if open_symbols:
+            print(f"Open orders for: {', '.join(open_symbols)}")
+            
+    except Exception as e:
+        open_symbols = set()
+        logger.error(f"Could not get orders: {e}")
+
+            
+        # Also get filled orders from today to avoid re-buying
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        filled_request = GetOrdersRequest(
+            status=QueryOrderStatus.FILLED,
+            after=today_start
+        )
+        filled_orders = broker.client.get_orders(filter=filled_request)
+        filled_symbols = {order.symbol for order in filled_orders}
+        
+        if filled_symbols:
+            print(f"Already bought today: {', '.join(filled_symbols)}")
+            
+    except Exception as e:
+        open_symbols = set()
+        filled_symbols = set()
+        logger.error(f"Could not get orders: {e}")
+
+    # Process signals
+    print(f"\nFound {len(signals)} signals:")
+    
+    for signal in signals:
+    # Check if we should skip this symbol
+        if signal.symbol in positions:
+            print(f"Skipping {signal.symbol} - have position")
+            continue
+            
+        if signal.symbol in open_symbols:
+            print(f"Skipping {signal.symbol} - open order pending")
+            continue
+        
+        print(f"\n{signal.signal_type.value.upper()}: {signal.symbol}")
+        print(f"Reason: {signal.reason}")
+        print(f"Confidence: {signal.confidence}")
+        
+        # Get current price - try latest first, then use last historical
+        current_price = None
+
+        # Try to get latest price
+        latest_prices = feed.get_latest_prices()
+        if signal.symbol in latest_prices:
+            current_price = latest_prices[signal.symbol].close
+        else:
+            # Fall back to last historical price
+            if signal.symbol in historical_data and historical_data[signal.symbol]:
+                current_price = historical_data[signal.symbol][-1].close
+                print(f"Using last historical price: ${current_price:.2f}")
+
+        if not current_price:
+            print(f"Could not get any price for {signal.symbol}")
+            continue
+
+        print(f"Current Price: ${current_price:.2f}")
+        
+        # Process signal
+        order_request = order_manager.process_signal(signal, current_price)
+        
+        if order_request:
+            # Create order
+            order = order_manager.create_order(order_request)
+            print(f"Order: {order.side.value} {order.quantity} shares")
+            
+            # Execute order
+            order_id = broker.place_order(order)
+            
+            if order_id:
+                print(f"✓ Order placed successfully! ID: {order_id}")
+            else:
+                print(f"✗ Failed to place order")
+
+
+def main():
+    """Main bot loop"""
+    print("=== Brot Trading Bot Started ===")
+    print(f"Environment: {settings.ENVIRONMENT}")
+    print(f"Check Interval: {settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS']}s")
+    
+    while True:
+        try:
+            execute_trading_cycle()
+            
+            # Wait for next cycle
+            print(f"\nWaiting {settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS']}s for next cycle...")
+            print("Press Ctrl+C to stop")
+            time.sleep(settings.TRADING_CONFIG['CHECK_INTERVAL_SECONDS'])
+            
+        except KeyboardInterrupt:
+            print("\n\nShutting down...")
+            break
+        except Exception as e:
+            logger.error(f"Error in trading cycle: {e}", exc_info=True)
+            time.sleep(30)
+
+
+if __name__ == "__main__":
+    main()

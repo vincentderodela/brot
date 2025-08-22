@@ -98,7 +98,8 @@ class DataFeed:
                 symbol_or_symbols=self.symbols,  # Can pass list of symbols
                 timeframe=TimeFrame.Minute,       # 1-minute candles
                 start=start_time,
-                end=end_time
+                end=end_time,
+                feed='iex'
             )
             
             # Fetch from Alpaca
@@ -106,9 +107,18 @@ class DataFeed:
             
             # Process each symbol
             for symbol in self.symbols:
-                if symbol in bars_df.index.get_level_values('symbol'):
-                    # Get the most recent bar for this symbol
-                    symbol_data = bars_df.xs(symbol, level='symbol')
+                try:
+                    # Check if the DataFrame has a MultiIndex
+                    if hasattr(bars_df.index, 'levels'):
+                        # MultiIndex case
+                        if symbol in bars_df.index.get_level_values('symbol'):
+                            symbol_data = bars_df.xs(symbol, level='symbol')
+                        else:
+                            continue
+                    else:
+                        # Single index case - filter by symbol column
+                        symbol_data = bars_df[bars_df['symbol'] == symbol]
+
                     if not symbol_data.empty:
                         # Take the last (most recent) row
                         latest_bar = symbol_data.iloc[-1]
@@ -124,6 +134,9 @@ class DataFeed:
                         
                         # Add to cache
                         self.price_cache[symbol].append(price_data)
+                except Exception as e:
+                    logger.debug(f"Error processing {symbol}: {e}")
+                    continue
             
             logger.debug(f"Fetched latest prices for {len(latest_prices)} symbols")
             
@@ -133,6 +146,14 @@ class DataFeed:
             for symbol in self.symbols:
                 if self.price_cache[symbol]:
                     latest_prices[symbol] = self.price_cache[symbol][-1]
+        
+        # If no minute data (market closed), get daily
+        if not latest_prices:
+            logger.info("No minute data available, using daily prices")
+            daily_data = self.get_historical_data(days=1)
+            for symbol, prices in daily_data.items():
+                if prices:
+                    latest_prices[symbol] = prices[-1]
         
         return latest_prices
     
@@ -168,7 +189,8 @@ class DataFeed:
                 symbol_or_symbols=self.symbols,
                 timeframe=TimeFrame.Day,  # Daily candles for historical
                 start=start_time,
-                end=end_time
+                end=end_time,
+                feed='iex'
             )
             
             # Fetch from Alpaca

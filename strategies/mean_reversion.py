@@ -31,6 +31,9 @@ class MeanReversionStrategy:
         """
         # Use provided values or defaults from config
         self.lookback_days = lookback_days or MEAN_REVERSION_CONFIG['LOOKBACK_DAYS']
+        # self lookbak testing for 3 days
+
+        # self.lookback_days = 3
         self.drop_threshold = drop_threshold or MEAN_REVERSION_CONFIG['DROP_THRESHOLD']
         self.gain_threshold = MEAN_REVERSION_CONFIG['GAIN_THRESHOLD']
         self.max_holding_days = MEAN_REVERSION_CONFIG['MAX_HOLDING_DAYS']
@@ -81,6 +84,9 @@ class MeanReversionStrategy:
             if len(prices) < self.lookback_days + 1:
                 logger.warning(f"Insufficient data for {symbol}, skipping")
                 continue
+
+            logger.debug(f"{symbol}: {len(prices)} price points")
+            df_data[symbol] = [p.close for p in prices]
                 
             # Extract closing prices
             df_data[symbol] = [p.close for p in prices]

@@ -29,8 +29,8 @@ TRADING_CONFIG = {
 # Strategies Parameters
 MEAN_REVERSION_CONFIG = {
     'LOOKBACK_DAYS': 7,
-    'DROP_THRESHOLD': 0.10,
-    'GAIN_THRESHOLD': 0.10,
+    'DROP_THRESHOLD': 0.02, # Changed from 0.10 (10%) to 0.02 (2%) for testing
+    'GAIN_THRESHOLD': 0.02, # Changed from 0.10 (10%) to 0.02 (2%) for testing
     'MAX_HOLDING_DAYS': 90,
     'MAX_ADDITIONS': 3
 }
@@ -50,6 +50,13 @@ MARKET_HOURS = {
     'CLOSE_HOUR': 16,
     'CLOSE_MINUTE': 0,
     'TIMEZONE': 'America/New_York'
+}
+# Circuit breakers and position limits
+SAFETY_CONFIG = {
+    'MAX_POSITIONS': 10,  # Maximum number of different stocks
+    'MAX_POSITION_VALUE': 10000,  # Maximum $ per position
+    'DAILY_LOSS_LIMIT': 0.05,  # Stop trading if down 5% in a day
+    'MAX_ORDERS_PER_DAY': 20,  # Prevent runaway trading
 }
 
 # Create necessary directories

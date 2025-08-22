@@ -1,3 +1,5 @@
+# Replace test_free_data.py with this corrected version:
+
 """
 Test data feed with free IEX data
 """
@@ -17,10 +19,10 @@ secret_key = os.getenv('ALPACA_SECRET_KEY')
 
 print("Testing Alpaca Free Data Access...\n")
 
-# Create client for free data
+# Create client with authentication (required even for free data)
 client = StockHistoricalDataClient(
-    api_key=None,  # None for free data
-    secret_key=None,
+    api_key=api_key,      # Use your credentials
+    secret_key=secret_key,
     raw_data=False
 )
 
@@ -30,7 +32,8 @@ request = StockBarsRequest(
     symbol_or_symbols=['AAPL', 'MSFT'],
     timeframe=TimeFrame.Day,
     start=datetime.now() - timedelta(days=5),
-    end=datetime.now()
+    end=datetime.now(),
+    feed='iex'
 )
 
 try:
@@ -61,7 +64,6 @@ try:
     bars = client.get_stock_bars(request)
     df = bars.df
     print(f"✓ Got {len(df)} minute bars")
-    # Note: IEX data is delayed by 15 minutes
     print("  (Note: IEX data has 15-minute delay)")
 except Exception as e:
     print(f"✗ Error: {e}")
