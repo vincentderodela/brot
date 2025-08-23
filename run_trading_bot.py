@@ -138,11 +138,11 @@ def execute_trading_cycle():
         
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         filled_request = GetOrdersRequest(
-            status='filled',
+            status='closed',
             after=today_start
         )
         filled_orders = broker.client.get_orders(filter=filled_request)
-        filled_symbols = {order.symbol for order in filled_orders}
+        filled_symbols = {order.symbol for order in filled_orders if order.filled_at is not None}
         
         if filled_symbols:
             print(f"Already bought today: {', '.join(filled_symbols)}")
