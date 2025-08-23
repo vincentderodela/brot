@@ -6,7 +6,7 @@ services:
     container_name: brot_trading_bot
     restart: unless-stopped
     environment:
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development
     env_file:
       - .env
     volumes:
